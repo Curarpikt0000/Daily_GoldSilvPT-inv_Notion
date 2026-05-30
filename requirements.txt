@@ -1,0 +1,5 @@
+requests
+xlrd==2.0.1
+notion-client
+pdfplumber
+beautifulsoup4

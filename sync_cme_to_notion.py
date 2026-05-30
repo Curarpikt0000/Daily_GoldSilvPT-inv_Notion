@@ -6,6 +6,9 @@ import xlrd
 import sys
 from datetime import datetime
 from notion_client import Client
+from notion_utils import push_to_notion_v2
+from sync_sge import sync_sge_inventory
+
 
 # ---------------- 配置区 ----------------
 GITHUB_REPO = "Curarpikt0000/cme-data-archive" 
@@ -78,51 +81,7 @@ def parse_cme_excel(filepath, reg_coords, elig_coords):
         print(f"解析文件 {filepath} 失败: {e}")
         return None, 0, 0
 
-def push_to_notion(metal_type, db_id, date_str, reg_val, elig_val):
-    date_prop = f"{metal_type}日期"
-    exists = []
-    
-    # 【核心修复】兼容 Notion 最新版 API (Data Sources) 的查询逻辑
-    try:
-        if hasattr(notion, 'data_sources'):
-            # 新版 SDK 逻辑：获取 DataSource ID 然后 Query
-            db_info = notion.databases.retrieve(database_id=db_id)
-            if "data_sources" in db_info and len(db_info["data_sources"]) > 0:
-                ds_id = db_info["data_sources"][0]["id"]
-                exists = notion.data_sources.query(
-                    data_source_id=ds_id,
-                    filter={"property": date_prop, "date": {"equals": date_str}}
-                ).get("results", [])
-        else:
-            # 兼容极个别旧版 SDK 的兜底逻辑
-            exists = notion.databases.query(
-                database_id=db_id,
-                filter={"property": date_prop, "date": {"equals": date_str}}
-            ).get("results", [])
-    except Exception as e:
-        print(f"[{metal_type}] 执行去重查询时出错: {e}")
-        return
 
-    # 去重判断
-    if exists:
-        print(f"[{metal_type}] 跳过: {date_str} 数据已存在")
-        return
-
-    # 写入新数据
-    try:
-        notion.pages.create(
-            parent={"database_id": db_id},
-            properties={
-                "Name": {"title": [{"text": {"content": f"{metal_type} {date_str}"}}]},
-                date_prop: {"date": {"start": date_str}},
-                f"{metal_type} Reg库存": {"number": reg_val},
-                f"{metal_type} Elig库存": {"number": elig_val},
-                "市场": {"select": {"name": "CME"}}
-            }
-        )
-        print(f"[{metal_type}] 成功同步: {date_str}")
-    except Exception as e:
-        print(f"[{metal_type}] 写入 Notion 失败: {e}")
 
 def main():
     target_folders = get_target_folders(GITHUB_REPO, mode=SYNC_MODE)
@@ -149,10 +108,16 @@ def main():
                 date_str, reg_val, elig_val = parse_cme_excel(filename, config["reg_coords"], config["elig_coords"])
                 
                 if date_str:
-                    push_to_notion(metal, config["db_id"], date_str, reg_val, elig_val)
+                    push_to_notion_v2(metal, config["db_id"], "CME", date_str, "每日", reg=reg_val, elig=elig_val)
                 time.sleep(0.5)
             except Exception as e:
                 print(f"处理 {metal} 时出错: {e}")
+                
+    print("\n--- 正在处理 SGE 东方库存 ---")
+    try:
+        sync_sge_inventory()
+    except Exception as e:
+        print(f"处理 SGE 出错: {e}")
 
 if __name__ == "__main__":
     main()
