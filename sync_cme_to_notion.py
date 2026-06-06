@@ -12,7 +12,7 @@ from sync_sge import sync_sge_inventory
 
 # ---------------- 配置区 ----------------
 GITHUB_REPO = "Curarpikt0000/cme-data-archive" 
-GITHUB_TOKEN = os.getenv("GH_PERSONAL_TOKEN")
+GITHUB_TOKEN = os.getenv("GH_PERSONAL_TOKEN") or os.getenv("GITHUB_TOKEN")
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 notion = Client(auth=NOTION_TOKEN)
 

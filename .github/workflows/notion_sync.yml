@@ -26,4 +26,5 @@ jobs:
       - name: Run Sync Script
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          GH_PERSONAL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python sync_cme_to_notion.py
